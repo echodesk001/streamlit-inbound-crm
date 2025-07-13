@@ -5,11 +5,12 @@ import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from googleapiclient.discovery import build
 from pytz import timezone
+import json
 
 # --- CONFIG ---
-SHEET_ID = "1WxMT_XE_7AumEu4i4SggxvCFhKeUICMGItLIRSh3nW0"
-SHEET_NAME = "CustomerDB"
-CALENDAR_ID = "91e3cb8e51ba6d89c47d982e091056bf7c1fc8a54b5a70ab344de91b6f9ab03e@group.calendar.google.com"
+SHEET_ID = st.secrets["SHEET_ID"]
+SHEET_NAME = st.secrets["SHEET_NAME"]
+CALENDAR_ID = st.secrets["CALENDAR_ID"]
 
 # --- AUTH ---
 scope = [
@@ -19,9 +20,11 @@ scope = [
     "https://www.googleapis.com/auth/calendar.events",
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp_service_account"], scope)
+# Instead of a local credentials.json file, use the json string from secrets
+creds_json = st.secrets["GCP_CREDENTIALS_JSON"]
+creds_dict = json.loads(creds_json)
 
-)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 sheet = client.open_by_key(SHEET_ID).worksheet(SHEET_NAME)
 calendar_service = build("calendar", "v3", credentials=creds)
@@ -135,6 +138,7 @@ st.title("📞The Moving Men")
 if st.session_state.mode == "search":
     st.header("🔍 Search Customer")
 
+    # --- Search Form ---
     with st.form("search_form"):
         name = st.text_input("Name")
         phone = st.text_input("Phone (last 9 digits okay)")
@@ -150,6 +154,7 @@ if st.session_state.mode == "search":
     if st.button("➕ New Booking"):
         st.session_state.mode = "new_booking"
 
+    # --- Upcoming Appointments ---
     st.subheader("📅 Upcoming Bookings")
     df = pd.DataFrame(sheet.get_all_records())
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -164,8 +169,9 @@ if st.session_state.mode == "search":
             st.write(f"🚚 {row['Service']}")
             st.write(f"📝 {row['Notes']}")
             if st.button("🔍 View/Modify Booking", key=row["PO No"]):
-                st.session_state.current_customer = (i + 2, row)
+                st.session_state.current_customer = (i + 2, row)  # +2 accounts for header and 0-index
                 st.session_state.mode = "view"
+
 
 # View Customer
 elif st.session_state.mode == "view":
@@ -186,7 +192,7 @@ elif st.session_state.mode == "view":
         if st.button("Yes, Cancel"):
             if cust.get("Event ID"):
                 delete_calendar_event(cust["Event ID"])
-            sheet.update(f"A{idx}:K{idx}", [[""] * 11])
+            sheet.update(f"A{idx}:K{idx}", [[""]*11])
             st.success("Cancelled.")
             st.session_state.mode = "search"
             st.session_state.current_customer = None
