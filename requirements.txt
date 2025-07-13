@@ -1,0 +1,7 @@
+streamlit
+gspread
+oauth2client
+google-api-python-client
+pandas
+pytz
+requests
