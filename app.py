@@ -9,7 +9,7 @@ from pytz import timezone
 # --- CONFIG ---
 SHEET_ID = "1WxMT_XE_7AumEu4i4SggxvCFhKeUICMGItLIRSh3nW0"
 SHEET_NAME = "CustomerDB"
-CREDENTIALS_FILE = "credentials.json"
+CREDENTIALS_FILE = "/app/secrets/credentials.json"
 CALENDAR_ID = "91e3cb8e51ba6d89c47d982e091056bf7c1fc8a54b5a70ab344de91b6f9ab03e@group.calendar.google.com"
 
 # --- AUTH ---
@@ -45,7 +45,6 @@ def generate_po_number():
 def get_calendar_events(date):
     time_min = tz.localize(datetime.datetime.combine(date, datetime.time(7, 0)))
     time_max = tz.localize(datetime.datetime.combine(date, datetime.time(18, 0)))
-
     events_result = calendar_service.events().list(
         calendarId=CALENDAR_ID,
         timeMin=time_min.isoformat(),
@@ -59,7 +58,6 @@ def is_time_available(date, start_time):
     start_dt = tz.localize(datetime.datetime.combine(date, start_time))
     end_dt = start_dt + datetime.timedelta(hours=4)
     events = get_calendar_events(date)
-
     for event in events:
         event_start = event["start"].get("dateTime")
         event_end = event["end"].get("dateTime")
@@ -72,7 +70,7 @@ def is_time_available(date, start_time):
 
 def get_available_slots(date):
     slots = []
-    for hour in range(7, 15):  # From 7 AM to 2 PM (4-hour blocks until 6 PM)
+    for hour in range(7, 15):
         start = datetime.time(hour, 0)
         if is_time_available(date, start):
             slots.append(start)
@@ -126,14 +124,10 @@ def display_customer(cust):
     st.write(f"**Service:** {cust['Service']}")
     st.write(f"**Notes:** {cust['Notes']}")
 
-# --- UI ---
 st.title("📞The Moving Men")
 
-# Search Page
 if st.session_state.mode == "search":
     st.header("🔍 Search Customer")
-
-    # --- Search Form ---
     with st.form("search_form"):
         name = st.text_input("Name")
         phone = st.text_input("Phone (last 9 digits okay)")
@@ -149,7 +143,6 @@ if st.session_state.mode == "search":
     if st.button("➕ New Booking"):
         st.session_state.mode = "new_booking"
 
-    # --- Upcoming Appointments ---
     st.subheader("📅 Upcoming Bookings")
     df = pd.DataFrame(sheet.get_all_records())
     df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
@@ -164,11 +157,9 @@ if st.session_state.mode == "search":
             st.write(f"🚚 {row['Service']}")
             st.write(f"📝 {row['Notes']}")
             if st.button("🔍 View/Modify Booking", key=row["PO No"]):
-                st.session_state.current_customer = (i + 2, row)  # +2 accounts for header and 0-index
+                st.session_state.current_customer = (i + 2, row)
                 st.session_state.mode = "view"
 
-
-# View Customer
 elif st.session_state.mode == "view":
     idx, cust = st.session_state.current_customer
     st.header("👤 Customer Info")
@@ -199,7 +190,6 @@ elif st.session_state.mode == "view":
         st.session_state.mode = "search"
         st.session_state.current_customer = None
 
-# Booking or Rebooking
 elif st.session_state.mode in ("new_booking", "rebook"):
     st.header("🗓️ Booking Form")
     if st.button("⬅️ Return to Search"):
